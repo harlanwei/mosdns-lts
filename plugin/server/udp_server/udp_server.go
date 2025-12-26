@@ -38,12 +38,18 @@ func init() {
 }
 
 type Args struct {
-	Entry  string `yaml:"entry"`
-	Listen string `yaml:"listen"`
+	Entry       string `yaml:"entry"`
+	Listen      string `yaml:"listen"`
+	WorkerPool  int    `yaml:"worker_pool"`
+	CPUAffinity bool   `yaml:"cpu_affinity"`
+	SO_RCVBUF   int    `yaml:"so_rcvbuf"`
+	SO_SNDBUF   int    `yaml:"so_sndbuf"`
 }
 
 func (a *Args) init() {
 	utils.SetDefaultString(&a.Listen, "127.0.0.1:53")
+	utils.SetDefaultNum(&a.SO_RCVBUF, 512*1024)
+	utils.SetDefaultNum(&a.SO_SNDBUF, 512*1024)
 }
 
 type UdpServer struct {
@@ -68,7 +74,8 @@ func StartServer(bp *coremain.BP, args *Args) (*UdpServer, error) {
 
 	socketOpt := server_utils.ListenerSocketOpts{
 		SO_REUSEPORT: true,
-		SO_RCVBUF:    64 * 1024,
+		SO_RCVBUF:    args.SO_RCVBUF,
+		SO_SNDBUF:    args.SO_SNDBUF,
 	}
 	lc := net.ListenConfig{Control: server_utils.ListenerControl(socketOpt)}
 	c, err := lc.ListenPacket(context.Background(), "udp", args.Listen)
@@ -79,7 +86,11 @@ func StartServer(bp *coremain.BP, args *Args) (*UdpServer, error) {
 
 	go func() {
 		defer c.Close()
-		err := server.ServeUDP(c.(*net.UDPConn), dh, server.UDPServerOpts{Logger: bp.L()})
+		err := server.ServeUDP(c.(*net.UDPConn), dh, server.UDPServerOpts{
+			Logger:         bp.L(),
+			WorkerPoolSize: args.WorkerPool,
+			CPUAffinity:    args.CPUAffinity,
+		})
 		bp.M().GetSafeClose().SendCloseSignal(err)
 	}()
 	return &UdpServer{

@@ -29,7 +29,7 @@ def go_build():
     logger.info(f'building {bin_filename}')
     try:
         subprocess.check_call(
-            f'go build -ldflags "-s -w -X main.version={VERSION}" -trimpath -o {bin_filename} ../', shell=True,
+            f'go build -ldflags "-s -w -X main.version={VERSION}" -trimpath -o {bin_filename} -pgo=auto ../', shell=True,
             env={"GOOS": "linux", "GOARCH": "amd64", "GOAMD64": "v3", **os.environ})
 
         if args.upx:

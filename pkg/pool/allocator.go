@@ -20,11 +20,31 @@
 package pool
 
 import (
+	"sync"
+
 	bytesPool "github.com/IrineSistiana/go-bytes-pool"
+	"github.com/miekg/dns"
 )
 
 var (
 	_pool      = bytesPool.NewPool(20) // 1Mb pool, should be enough.
 	GetBuf     = _pool.Get
 	ReleaseBuf = _pool.Release
+
+	dnsMsgPool sync.Pool
 )
+
+func init() {
+	dnsMsgPool.New = func() any {
+		return new(dns.Msg)
+	}
+}
+
+func GetDNSMsg() *dns.Msg {
+	return dnsMsgPool.Get().(*dns.Msg)
+}
+
+func ReleaseDNSMsg(m *dns.Msg) {
+	*m = dns.Msg{}
+	dnsMsgPool.Put(m)
+}

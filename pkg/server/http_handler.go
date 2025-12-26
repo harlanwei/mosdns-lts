@@ -125,8 +125,6 @@ func readClientAddrFromXFF(s string) (netip.Addr, error) {
 
 var errInvalidMediaType = errors.New("missing or invalid media type header")
 
-var bufPool = pool.NewBytesBufPool(512)
-
 func ReadMsgFromReq(req *http.Request) (*dns.Msg, error) {
 	var b []byte
 
@@ -158,13 +156,13 @@ func ReadMsgFromReq(req *http.Request) (*dns.Msg, error) {
 			return nil, errInvalidMediaType
 		}
 
-		buf := bufPool.Get()
-		defer bufPool.Release(buf)
-		_, err := buf.ReadFrom(io.LimitReader(req.Body, dns.MaxMsgSize))
-		if err != nil {
+		buf := pool.GetBuf(dns.MaxMsgSize)
+		defer pool.ReleaseBuf(buf)
+		n, err := io.ReadFull(io.LimitReader(req.Body, dns.MaxMsgSize), *buf)
+		if err != nil && err != io.ErrUnexpectedEOF {
 			return nil, fmt.Errorf("failed to read request body: %w", err)
 		}
-		b = buf.Bytes()
+		b = (*buf)[:n]
 	default:
 		return nil, fmt.Errorf("unsupported method: %s", req.Method)
 	}
