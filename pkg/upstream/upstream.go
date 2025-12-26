@@ -495,8 +495,7 @@ func NewUpstream(addr string, opt Opt) (_ Upstream, err error) {
 		if opt.IdleTimeout > 0 {
 			quicConfig.MaxIdleTimeout = opt.IdleTimeout
 		}
-		// Don't accept stream.
-		quicConfig.MaxIncomingStreams = -1
+		quicConfig.MaxIncomingStreams = 10
 		quicConfig.MaxIncomingUniStreams = -1
 
 		udpBootstrap, err := newUdpAddrResolveFunc(defaultPort)
@@ -596,14 +595,16 @@ func newDefaultClientQuicConfig() *quic.Config {
 	return &quic.Config{
 		TokenStore: quic.NewLRUTokenStore(4, 8),
 
-		// Dns does not need large amount of io, so the rx/tx windows are small.
-		InitialStreamReceiveWindow:     4 * 1024,
-		MaxStreamReceiveWindow:         4 * 1024,
-		InitialConnectionReceiveWindow: 8 * 1024,
-		MaxConnectionReceiveWindow:     64 * 1024,
+		InitialStreamReceiveWindow:     64 * 1024,
+		MaxStreamReceiveWindow:         64 * 1024,
+		InitialConnectionReceiveWindow: 512 * 1024,
+		MaxConnectionReceiveWindow:     2 * 1024 * 1024,
 
-		MaxIdleTimeout:       time.Second * 30,
-		KeepAlivePeriod:      time.Second * 25,
+		MaxIdleTimeout:       time.Second * 120,
+		KeepAlivePeriod:      time.Second * 15,
 		HandshakeIdleTimeout: tlsHandshakeTimeout,
+
+		Allow0RTT:          true,
+		MaxIncomingStreams: 100,
 	}
 }

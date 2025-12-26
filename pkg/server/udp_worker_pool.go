@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2020-2022, IrineSistiana
  * Copyright (C) 2025, Wei Chen
  *
  * This file is part of mosdns.

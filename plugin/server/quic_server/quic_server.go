@@ -93,14 +93,16 @@ func StartServer(bp *coremain.BP, args *Args) (*QuicServer, error) {
 
 	quicConfig := &quic.Config{
 		MaxIdleTimeout:                 idleTimeout,
-		InitialStreamReceiveWindow:     4 * 1024,
-		MaxStreamReceiveWindow:         4 * 1024,
-		InitialConnectionReceiveWindow: 8 * 1024,
-		MaxConnectionReceiveWindow:     16 * 1024,
-		Allow0RTT:                      false,
+		InitialStreamReceiveWindow:     64 * 1024,
+		MaxStreamReceiveWindow:         64 * 1024,
+		InitialConnectionReceiveWindow: 512 * 1024,
+		MaxConnectionReceiveWindow:     2 * 1024 * 1024,
+		Allow0RTT:                      true,
 
-		// UniStream is not allowed.
+		MaxIncomingStreams:    100,
 		MaxIncomingUniStreams: -1,
+
+		KeepAlivePeriod: time.Second * 15,
 	}
 
 	srk, _, err := utils.InitQUICSrkFromIfaceMac()
