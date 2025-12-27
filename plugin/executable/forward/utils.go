@@ -42,6 +42,7 @@ type upstreamWrapper struct {
 
 	connOpened prometheus.Counter
 	connClosed prometheus.Counter
+	usedTotal  prometheus.Counter
 
 	emaLatency atomic.Int64
 }
@@ -93,6 +94,11 @@ func newWrapper(idx int, cfg UpstreamConfig, pluginTag string) *upstreamWrapper 
 			Help:        "The total number of connections that are closed",
 			ConstLabels: lb,
 		}),
+		usedTotal: prometheus.NewCounter(prometheus.CounterOpts{
+			Name:        "used_total",
+			Help:        "The total number of queries where this upstream's response was used",
+			ConstLabels: lb,
+		}),
 	}
 }
 
@@ -104,6 +110,7 @@ func (uw *upstreamWrapper) registerMetricsTo(r prometheus.Registerer) error {
 		uw.responseLatency,
 		uw.connOpened,
 		uw.connClosed,
+		uw.usedTotal,
 	} {
 		if err := r.Register(collector); err != nil {
 			return err
@@ -138,6 +145,10 @@ func (uw *upstreamWrapper) ExchangeContext(ctx context.Context, m []byte) (*[]by
 		uw.updateEmaLatency(latency)
 	}
 	return r, err
+}
+
+func (uw *upstreamWrapper) IncrementUsedTotal() {
+	uw.usedTotal.Inc()
 }
 
 func (uw *upstreamWrapper) Close() error {

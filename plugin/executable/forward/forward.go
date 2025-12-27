@@ -256,6 +256,7 @@ func (f *Forward) exchange(ctx context.Context, qCtx *query_context.Context, us 
 	type res struct {
 		r   *dns.Msg
 		err error
+		uw  *upstreamWrapper
 	}
 
 	resChan := make(chan res)
@@ -266,14 +267,14 @@ func (f *Forward) exchange(ctx context.Context, qCtx *query_context.Context, us 
 	for _, idx := range selectedIndices {
 		u := us[idx]
 		qc := copyPayload(queryPayload)
-		go func(uqid uint32, question dns.Question) {
+		go func(uw *upstreamWrapper, uqid uint32, question dns.Question) {
 			defer pool.ReleaseBuf(qc)
 			// Give each upstream a fixed timeout to finish the query.
 			upstreamCtx, cancel := context.WithTimeout(context.Background(), queryTimeout)
 			defer cancel()
 
 			var r *dns.Msg
-			respPayload, err := u.ExchangeContext(upstreamCtx, *qc)
+			respPayload, err := uw.ExchangeContext(upstreamCtx, *qc)
 			if err != nil {
 				f.logger.Warn(
 					"upstream error",
@@ -281,7 +282,7 @@ func (f *Forward) exchange(ctx context.Context, qCtx *query_context.Context, us 
 					zap.String("qname", question.Name),
 					zap.Uint16("qclass", question.Qclass),
 					zap.Uint16("qtype", question.Qtype),
-					zap.String("upstream", u.name()),
+					zap.String("upstream", uw.name()),
 					zap.Error(err),
 				)
 			} else {
@@ -293,10 +294,10 @@ func (f *Forward) exchange(ctx context.Context, qCtx *query_context.Context, us 
 				}
 			}
 			select {
-			case resChan <- res{r: r, err: err}:
+			case resChan <- res{r: r, err: err, uw: uw}:
 			case <-done:
 			}
-		}(qCtx.Id(), qCtx.QQuestion())
+		}(u, qCtx.Id(), qCtx.QQuestion())
 	}
 
 	for i := 0; i < concurrent; i++ {
@@ -311,6 +312,7 @@ func (f *Forward) exchange(ctx context.Context, qCtx *query_context.Context, us 
 			if i < concurrent-1 && r.Rcode != dns.RcodeSuccess && r.Rcode != dns.RcodeNameError {
 				continue
 			}
+			res.uw.IncrementUsedTotal()
 			return r, nil
 		case <-ctx.Done():
 			return nil, context.Cause(ctx)
