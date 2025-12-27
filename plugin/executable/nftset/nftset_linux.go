@@ -26,10 +26,10 @@ import (
 	"fmt"
 	"net/netip"
 
-	"github.com/IrineSistiana/mosdns/v5/pkg/nftset_utils"
-	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
-	"github.com/IrineSistiana/mosdns/v5/pkg/utils"
 	"github.com/google/nftables"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/nftset_utils"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/query_context"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/utils"
 	"github.com/miekg/dns"
 )
 

@@ -20,8 +20,8 @@
 package data_provider
 
 import (
-	"github.com/IrineSistiana/mosdns/v5/pkg/matcher/domain"
-	"github.com/IrineSistiana/mosdns/v5/pkg/matcher/netlist"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/matcher/domain"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/matcher/netlist"
 )
 
 type DomainMatcherProvider interface {

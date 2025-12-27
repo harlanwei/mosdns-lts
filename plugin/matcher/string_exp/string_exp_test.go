@@ -24,7 +24,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/query_context"
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/require"
 )

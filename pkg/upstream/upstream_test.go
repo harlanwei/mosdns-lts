@@ -29,7 +29,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IrineSistiana/mosdns/v5/pkg/utils"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/utils"
 	"github.com/miekg/dns"
 )
 

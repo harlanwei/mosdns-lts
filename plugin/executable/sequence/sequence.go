@@ -21,8 +21,8 @@ package sequence
 
 import (
 	"context"
-	"github.com/IrineSistiana/mosdns/v5/coremain"
-	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
+	"github.com/harlanwei/mosdns-lts/v5/coremain"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/query_context"
 )
 
 const PluginType = "sequence"

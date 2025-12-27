@@ -29,7 +29,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/IrineSistiana/mosdns/v5/pkg/dnsutils"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/dnsutils"
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
 )

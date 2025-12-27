@@ -23,7 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/query_context"
 	"io"
 )
 

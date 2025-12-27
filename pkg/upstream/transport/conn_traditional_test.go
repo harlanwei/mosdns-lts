@@ -30,8 +30,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IrineSistiana/mosdns/v5/pkg/dnsutils"
-	"github.com/IrineSistiana/mosdns/v5/pkg/pool"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/dnsutils"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/pool"
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/require"
 )

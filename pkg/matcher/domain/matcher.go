@@ -25,7 +25,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/IrineSistiana/mosdns/v5/pkg/utils"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/utils"
 )
 
 var _ WriteableMatcher[any] = (*MixMatcher[any])(nil)

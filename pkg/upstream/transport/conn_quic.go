@@ -5,8 +5,8 @@ import (
 	"encoding/binary"
 	"time"
 
-	"github.com/IrineSistiana/mosdns/v5/pkg/dnsutils"
-	"github.com/IrineSistiana/mosdns/v5/pkg/pool"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/dnsutils"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/pool"
 	"github.com/quic-go/quic-go"
 )
 

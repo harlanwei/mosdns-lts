@@ -1,4 +1,4 @@
-module github.com/IrineSistiana/mosdns/v5
+module github.com/harlanwei/mosdns-lts/v5
 
 go 1.25.0
 

@@ -21,7 +21,7 @@ package nftset
 
 import (
 	"fmt"
-	"github.com/IrineSistiana/mosdns/v5/plugin/executable/sequence"
+	"github.com/harlanwei/mosdns-lts/v5/plugin/executable/sequence"
 	"strconv"
 	"strings"
 )

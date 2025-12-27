@@ -26,10 +26,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/IrineSistiana/mosdns/v5/coremain"
-	"github.com/IrineSistiana/mosdns/v5/pkg/matcher/domain"
-	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
-	"github.com/IrineSistiana/mosdns/v5/plugin/executable/sequence"
+	"github.com/harlanwei/mosdns-lts/v5/coremain"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/matcher/domain"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/query_context"
+	"github.com/harlanwei/mosdns-lts/v5/plugin/executable/sequence"
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
 )

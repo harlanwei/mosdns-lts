@@ -23,7 +23,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"github.com/IrineSistiana/mosdns/v5/pkg/utils"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/utils"
 	"io"
 	"strings"
 	"unicode"

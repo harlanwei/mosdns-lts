@@ -23,7 +23,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/IrineSistiana/mosdns/v5/pkg/server"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/server"
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

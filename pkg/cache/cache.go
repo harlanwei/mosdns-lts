@@ -20,9 +20,9 @@
 package cache
 
 import (
-	"github.com/IrineSistiana/mosdns/v5/pkg/concurrent_lru"
-	"github.com/IrineSistiana/mosdns/v5/pkg/concurrent_map"
-	"github.com/IrineSistiana/mosdns/v5/pkg/utils"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/concurrent_lru"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/concurrent_map"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/utils"
 	"sync/atomic"
 	"time"
 )

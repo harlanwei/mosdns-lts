@@ -25,11 +25,11 @@ import (
 	"io"
 	"net/netip"
 
-	"github.com/IrineSistiana/mosdns/v5/coremain"
-	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
-	"github.com/IrineSistiana/mosdns/v5/pkg/rate_limiter"
-	"github.com/IrineSistiana/mosdns/v5/pkg/utils"
-	"github.com/IrineSistiana/mosdns/v5/plugin/executable/sequence"
+	"github.com/harlanwei/mosdns-lts/v5/coremain"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/query_context"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/rate_limiter"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/utils"
+	"github.com/harlanwei/mosdns-lts/v5/plugin/executable/sequence"
 	"golang.org/x/time/rate"
 )
 

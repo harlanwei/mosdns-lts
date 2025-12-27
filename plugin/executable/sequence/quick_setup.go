@@ -21,7 +21,7 @@ package sequence
 
 import (
 	"fmt"
-	"github.com/IrineSistiana/mosdns/v5/coremain"
+	"github.com/harlanwei/mosdns-lts/v5/coremain"
 	"go.uber.org/zap"
 	"sync"
 )

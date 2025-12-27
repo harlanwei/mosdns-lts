@@ -21,10 +21,11 @@ package fastforward
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
-	"github.com/IrineSistiana/mosdns/v5/pkg/pool"
-	"github.com/IrineSistiana/mosdns/v5/pkg/upstream"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/pool"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/upstream"
 	"github.com/miekg/dns"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap/zapcore"
@@ -41,6 +42,8 @@ type upstreamWrapper struct {
 
 	connOpened prometheus.Counter
 	connClosed prometheus.Counter
+
+	emaLatency atomic.Int64
 }
 
 func (uw *upstreamWrapper) OnEvent(typ upstream.Event) {
@@ -126,16 +129,35 @@ func (uw *upstreamWrapper) ExchangeContext(ctx context.Context, m []byte) (*[]by
 	r, err := uw.u.ExchangeContext(ctx, m)
 	uw.thread.Dec()
 
+	latency := time.Since(start).Milliseconds()
+
 	if err != nil {
 		uw.errTotal.Inc()
 	} else {
-		uw.responseLatency.Observe(float64(time.Since(start).Milliseconds()))
+		uw.responseLatency.Observe(float64(latency))
+		uw.updateEmaLatency(latency)
 	}
 	return r, err
 }
 
 func (uw *upstreamWrapper) Close() error {
 	return uw.u.Close()
+}
+
+func (uw *upstreamWrapper) updateEmaLatency(latency int64) {
+	const alpha = 0.3
+
+	current := uw.emaLatency.Load()
+	if current == 0 {
+		uw.emaLatency.Store(latency)
+	} else {
+		newLatency := int64(float64(current)*(1-alpha) + float64(latency)*alpha)
+		uw.emaLatency.Store(newLatency)
+	}
+}
+
+func (uw *upstreamWrapper) getEmaLatency() int64 {
+	return uw.emaLatency.Load()
 }
 
 type queryInfo dns.Msg

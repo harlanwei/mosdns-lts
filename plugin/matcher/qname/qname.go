@@ -20,10 +20,10 @@
 package qname
 
 import (
-	"github.com/IrineSistiana/mosdns/v5/pkg/matcher/domain"
-	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
-	"github.com/IrineSistiana/mosdns/v5/plugin/executable/sequence"
-	base "github.com/IrineSistiana/mosdns/v5/plugin/matcher/base_domain"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/matcher/domain"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/query_context"
+	"github.com/harlanwei/mosdns-lts/v5/plugin/executable/sequence"
+	base "github.com/harlanwei/mosdns-lts/v5/plugin/matcher/base_domain"
 )
 
 const PluginType = "qname"

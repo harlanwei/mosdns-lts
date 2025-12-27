@@ -21,9 +21,9 @@ package coremain
 
 import (
 	"fmt"
-	"github.com/IrineSistiana/mosdns/v5/mlog"
-	"github.com/kardianos/service"
 	"github.com/go-viper/mapstructure/v2"
+	"github.com/harlanwei/mosdns-lts/v5/mlog"
+	"github.com/kardianos/service"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"

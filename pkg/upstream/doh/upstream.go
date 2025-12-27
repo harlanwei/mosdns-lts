@@ -29,15 +29,15 @@ import (
 	urlpkg "net/url"
 	"time"
 
-	"github.com/IrineSistiana/mosdns/v5/pkg/dnsutils"
-	"github.com/IrineSistiana/mosdns/v5/pkg/pool"
-	"github.com/IrineSistiana/mosdns/v5/pkg/utils"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/dnsutils"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/pool"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/utils"
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
 )
 
 const (
-	defaultDoHTimeout = time.Second * 6
+	defaultDoHTimeout = time.Second * 10
 )
 
 var nopLogger = zap.NewNop()

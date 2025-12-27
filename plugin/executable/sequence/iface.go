@@ -21,7 +21,7 @@ package sequence
 
 import (
 	"context"
-	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/query_context"
 )
 
 // RecursiveExecutable represents something that is executable and requires stack.

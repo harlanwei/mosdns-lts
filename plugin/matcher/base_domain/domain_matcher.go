@@ -22,11 +22,11 @@ package base_domain
 import (
 	"context"
 	"fmt"
-	"github.com/IrineSistiana/mosdns/v5/pkg/matcher/domain"
-	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
-	"github.com/IrineSistiana/mosdns/v5/plugin/data_provider"
-	"github.com/IrineSistiana/mosdns/v5/plugin/data_provider/domain_set"
-	"github.com/IrineSistiana/mosdns/v5/plugin/executable/sequence"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/matcher/domain"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/query_context"
+	"github.com/harlanwei/mosdns-lts/v5/plugin/data_provider"
+	"github.com/harlanwei/mosdns-lts/v5/plugin/data_provider/domain_set"
+	"github.com/harlanwei/mosdns-lts/v5/plugin/executable/sequence"
 	"strings"
 )
 

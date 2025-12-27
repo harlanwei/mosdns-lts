@@ -27,8 +27,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/IrineSistiana/mosdns/v5/mlog"
-	"github.com/IrineSistiana/mosdns/v5/pkg/utils"
+	"github.com/harlanwei/mosdns-lts/v5/mlog"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/utils"
 	"github.com/miekg/dns"
 	"github.com/spf13/cobra"
 )

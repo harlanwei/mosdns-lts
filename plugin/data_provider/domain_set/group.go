@@ -19,7 +19,7 @@
 
 package domain_set
 
-import "github.com/IrineSistiana/mosdns/v5/pkg/matcher/domain"
+import "github.com/harlanwei/mosdns-lts/v5/pkg/matcher/domain"
 
 type MatcherGroup []domain.Matcher[struct{}]
 

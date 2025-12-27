@@ -28,12 +28,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/IrineSistiana/mosdns/v5/coremain"
-	"github.com/IrineSistiana/mosdns/v5/pkg/pool"
-	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
-	"github.com/IrineSistiana/mosdns/v5/pkg/upstream"
-	"github.com/IrineSistiana/mosdns/v5/pkg/utils"
-	"github.com/IrineSistiana/mosdns/v5/plugin/executable/sequence"
+	"github.com/harlanwei/mosdns-lts/v5/coremain"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/pool"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/query_context"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/upstream"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/utils"
+	"github.com/harlanwei/mosdns-lts/v5/plugin/executable/sequence"
 	"github.com/miekg/dns"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -262,9 +262,9 @@ func (f *Forward) exchange(ctx context.Context, qCtx *query_context.Context, us 
 	done := make(chan struct{})
 	defer close(done)
 
-	r := rand.IntN(len(us))
-	for i := 0; i < concurrent; i++ {
-		u := us[(r+i)%len(us)]
+	selectedIndices := f.selectUpstreams(us, concurrent)
+	for _, idx := range selectedIndices {
+		u := us[idx]
 		qc := copyPayload(queryPayload)
 		go func(uqid uint32, question dns.Question) {
 			defer pool.ReleaseBuf(qc)
@@ -326,4 +326,56 @@ func quickSetup(bq sequence.BQ, s string) (any, error) {
 		args.Upstreams = append(args.Upstreams, UpstreamConfig{Addr: u})
 	}
 	return NewForward(args, Opts{Logger: bq.L()})
+}
+
+func (f *Forward) selectUpstreams(us []*upstreamWrapper, count int) []int {
+	const noiseFactor = 0.2
+
+	if len(us) <= count {
+		indices := make([]int, len(us))
+		for i := range indices {
+			indices[i] = i
+		}
+		return indices
+	}
+
+	selected := make([]int, 0, count)
+	remaining := make(map[int]bool)
+	for i := range us {
+		remaining[i] = true
+	}
+
+	for len(selected) < count && len(remaining) > 0 {
+		latencies := make([]float64, len(us))
+		totalWeight := 0.0
+
+		for i := range remaining {
+			latency := float64(us[i].getEmaLatency())
+			if latency == 0 {
+				latency = 100.0
+			}
+			latencies[i] = latency
+
+			noise := (rand.Float64()*2 - 1) * noiseFactor
+			weight := (1.0 / latency) * (1 + noise)
+			totalWeight += weight
+		}
+
+		r := rand.Float64() * totalWeight
+		cumulativeWeight := 0.0
+
+		for i := range remaining {
+			noise := (rand.Float64()*2 - 1) * noiseFactor
+			weight := (1.0 / latencies[i]) * (1 + noise)
+			cumulativeWeight += weight
+
+			if r <= cumulativeWeight {
+				selected = append(selected, i)
+				delete(remaining, i)
+				break
+			}
+		}
+	}
+
+	return selected
 }

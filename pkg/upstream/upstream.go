@@ -33,12 +33,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/IrineSistiana/mosdns/v5/mlog"
-	"github.com/IrineSistiana/mosdns/v5/pkg/pool"
-	"github.com/IrineSistiana/mosdns/v5/pkg/upstream/bootstrap"
-	"github.com/IrineSistiana/mosdns/v5/pkg/upstream/doh"
-	"github.com/IrineSistiana/mosdns/v5/pkg/upstream/transport"
-	"github.com/IrineSistiana/mosdns/v5/pkg/utils"
+	"github.com/harlanwei/mosdns-lts/v5/mlog"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/pool"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/upstream/adaptive_doh"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/upstream/bootstrap"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/upstream/doh"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/upstream/transport"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/utils"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	"go.uber.org/zap"
@@ -99,6 +100,12 @@ type Opt struct {
 	// EnableHTTP3 will use HTTP/3 protocol to connect a DoH upstream. (aka DoH3).
 	// Note: There is no fallback. Make sure the server supports it.
 	EnableHTTP3 bool
+
+	// AdaptiveDoH enables adaptive selection between DoH and DoH3 protocols.
+	// When enabled, both DoH and DoH3 will be used, and the system will
+	// automatically select the better performing protocol based on latency
+	// and reliability metrics. This overrides EnableHTTP3.
+	AdaptiveDoH bool
 
 	// Bootstrap specifies a plain dns server to solve the
 	// upstream server domain address.
@@ -407,6 +414,74 @@ func NewUpstream(addr string, opt Opt) (_ Upstream, err error) {
 			idleConnTimeout = opt.IdleTimeout
 		}
 
+		if opt.AdaptiveDoH {
+			tcpDialer, err := newTcpDialer(false, defaultPort)
+			if err != nil {
+				return nil, fmt.Errorf("failed to init tcp dialer, %w", err)
+			}
+
+			udpBootstrap, err := newUdpAddrResolveFunc(defaultPort)
+			if err != nil {
+				return nil, fmt.Errorf("failed to init udp addr bootstrap, %w", err)
+			}
+
+			lc := net.ListenConfig{Control: getSocketControlFunc(socketOpts{so_mark: opt.SoMark, bind_to_device: opt.BindToDevice})}
+			conn, err := lc.ListenPacket(context.Background(), "udp", "")
+			if err != nil {
+				return nil, fmt.Errorf("failed to init udp socket for quic, %w", err)
+			}
+			quicTransport := &quic.Transport{
+				Conn: conn,
+			}
+			quicConfig := newDefaultClientQuicConfig()
+			quicConfig.MaxIdleTimeout = idleConnTimeout
+
+			t1 := &http.Transport{
+				DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+					c, err := tcpDialer(ctx)
+					c = wrapConn(c, opt.EventObserver)
+					return c, err
+				},
+				TLSClientConfig:     opt.TLSConfig,
+				TLSHandshakeTimeout: tlsHandshakeTimeout,
+				IdleConnTimeout:     idleConnTimeout,
+			}
+
+			t2, err := http2.ConfigureTransports(t1)
+			if err != nil {
+				return nil, fmt.Errorf("failed to upgrade http2 support, %w", err)
+			}
+			t2.MaxHeaderListSize = 4 * 1024
+			t2.MaxReadFrameSize = 16 * 1024
+			t2.ReadIdleTimeout = time.Second * 30
+			t2.PingTimeout = time.Second * 5
+
+			t3 := &http3.Transport{
+				TLSClientConfig: opt.TLSConfig,
+				QUICConfig:      quicConfig,
+				Dial: func(ctx context.Context, _ string, tlsCfg *tls.Config, cfg *quic.Config) (*quic.Conn, error) {
+					ua, err := udpBootstrap(ctx)
+					if err != nil {
+						return nil, err
+					}
+					return quicTransport.DialEarly(ctx, ua, tlsCfg, cfg)
+				},
+			}
+
+			adaptiveUpstream, err := adaptive_doh.CreateAdaptiveUpstream(addrURL.String(), t1, t3, adaptive_doh.Opt{
+				Logger: opt.Logger,
+			})
+			if err != nil {
+				quicTransport.Close()
+				return nil, fmt.Errorf("failed to create adaptive doh upstream, %w", err)
+			}
+
+			return &adaptiveDoHWithClose{
+				u:      adaptiveUpstream,
+				closer: quicTransport,
+			}, nil
+		}
+
 		var t http.RoundTripper
 		var addonCloser io.Closer
 		if opt.EnableHTTP3 {
@@ -438,7 +513,6 @@ func NewUpstream(addr string, opt Opt) (_ Upstream, err error) {
 					}
 					return quicTransport.DialEarly(ctx, ua, tlsCfg, cfg)
 				},
-				MaxResponseHeaderBytes: 4 * 1024,
 			}
 		} else {
 			tcpDialer, err := newTcpDialer(false, defaultPort)
@@ -585,6 +659,22 @@ func (u *dohWithClose) ExchangeContext(ctx context.Context, m []byte) (*[]byte, 
 }
 
 func (u *dohWithClose) Close() error {
+	if u.closer != nil {
+		return u.closer.Close()
+	}
+	return nil
+}
+
+type adaptiveDoHWithClose struct {
+	u      *adaptive_doh.Upstream
+	closer io.Closer // maybe nil
+}
+
+func (u *adaptiveDoHWithClose) ExchangeContext(ctx context.Context, m []byte) (*[]byte, error) {
+	return u.u.ExchangeContext(ctx, m)
+}
+
+func (u *adaptiveDoHWithClose) Close() error {
 	if u.closer != nil {
 		return u.closer.Close()
 	}

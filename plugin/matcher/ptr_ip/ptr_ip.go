@@ -20,11 +20,11 @@
 package ptr_ip
 
 import (
-	"github.com/IrineSistiana/mosdns/v5/pkg/dnsutils"
-	"github.com/IrineSistiana/mosdns/v5/pkg/matcher/netlist"
-	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
-	"github.com/IrineSistiana/mosdns/v5/plugin/executable/sequence"
-	"github.com/IrineSistiana/mosdns/v5/plugin/matcher/base_ip"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/dnsutils"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/matcher/netlist"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/query_context"
+	"github.com/harlanwei/mosdns-lts/v5/plugin/executable/sequence"
+	"github.com/harlanwei/mosdns-lts/v5/plugin/matcher/base_ip"
 	"github.com/miekg/dns"
 )
 

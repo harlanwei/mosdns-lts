@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/IrineSistiana/mosdns/v5/pkg/pool"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/pool"
 	"github.com/miekg/dns"
 )
 

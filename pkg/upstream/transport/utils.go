@@ -23,7 +23,7 @@ import (
 	"encoding/binary"
 	"io"
 
-	"github.com/IrineSistiana/mosdns/v5/pkg/pool"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/pool"
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
 	"golang.org/x/exp/constraints"

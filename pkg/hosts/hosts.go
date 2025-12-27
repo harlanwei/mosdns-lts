@@ -22,8 +22,8 @@ package hosts
 import (
 	"errors"
 	"fmt"
-	"github.com/IrineSistiana/mosdns/v5/pkg/dnsutils"
-	"github.com/IrineSistiana/mosdns/v5/pkg/matcher/domain"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/dnsutils"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/matcher/domain"
 	"github.com/miekg/dns"
 	"net/netip"
 	"strings"

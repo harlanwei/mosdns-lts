@@ -28,7 +28,7 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/IrineSistiana/mosdns/v5/pkg/pool"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/pool"
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
 )
@@ -69,7 +69,7 @@ func (h *HttpHandler) warnErr(req *http.Request, msg string, err error) {
 func (h *HttpHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// If server is on unix domain socket, RemoteAddr is not ip:port.
 	// Just ignore it.
-	// https://github.com/IrineSistiana/mosdns/issues/830
+	// https://github.com/harlanwei/mosdns-lts/issues/830
 	addrPort, _ := netip.ParseAddrPort(req.RemoteAddr)
 	clientAddr := addrPort.Addr()
 

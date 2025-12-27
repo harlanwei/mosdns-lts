@@ -22,10 +22,10 @@ package server_utils
 import (
 	"fmt"
 
-	"github.com/IrineSistiana/mosdns/v5/coremain"
-	"github.com/IrineSistiana/mosdns/v5/pkg/server"
-	"github.com/IrineSistiana/mosdns/v5/pkg/server_handler"
-	"github.com/IrineSistiana/mosdns/v5/plugin/executable/sequence"
+	"github.com/harlanwei/mosdns-lts/v5/coremain"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/server"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/server_handler"
+	"github.com/harlanwei/mosdns-lts/v5/plugin/executable/sequence"
 )
 
 func NewHandler(bp *coremain.BP, entry string) (server.Handler, error) {

@@ -23,9 +23,9 @@ import (
 	"hash/maphash"
 	"time"
 
-	"github.com/IrineSistiana/mosdns/v5/pkg/cache"
-	"github.com/IrineSistiana/mosdns/v5/pkg/dnsutils"
-	"github.com/IrineSistiana/mosdns/v5/pkg/utils"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/cache"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/dnsutils"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/utils"
 	"github.com/miekg/dns"
 	"golang.org/x/exp/constraints"
 )

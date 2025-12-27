@@ -20,9 +20,9 @@
 package rcode
 
 import (
-	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
-	"github.com/IrineSistiana/mosdns/v5/plugin/executable/sequence"
-	"github.com/IrineSistiana/mosdns/v5/plugin/matcher/base_int"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/query_context"
+	"github.com/harlanwei/mosdns-lts/v5/plugin/executable/sequence"
+	"github.com/harlanwei/mosdns-lts/v5/plugin/matcher/base_int"
 )
 
 const PluginType = "rcode"

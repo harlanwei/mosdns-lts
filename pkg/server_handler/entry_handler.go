@@ -23,11 +23,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/IrineSistiana/mosdns/v5/mlog"
-	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
-	"github.com/IrineSistiana/mosdns/v5/pkg/server"
-	"github.com/IrineSistiana/mosdns/v5/pkg/utils"
-	"github.com/IrineSistiana/mosdns/v5/plugin/executable/sequence"
+	"github.com/harlanwei/mosdns-lts/v5/mlog"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/query_context"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/server"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/utils"
+	"github.com/harlanwei/mosdns-lts/v5/plugin/executable/sequence"
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
 )

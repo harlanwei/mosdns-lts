@@ -25,7 +25,7 @@ import (
 	"net/netip"
 	"runtime"
 
-	"github.com/IrineSistiana/mosdns/v5/pkg/pool"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/pool"
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
 )

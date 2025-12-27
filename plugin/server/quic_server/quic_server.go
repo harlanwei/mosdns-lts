@@ -26,10 +26,10 @@ import (
 	"net"
 	"time"
 
-	"github.com/IrineSistiana/mosdns/v5/coremain"
-	"github.com/IrineSistiana/mosdns/v5/pkg/server"
-	"github.com/IrineSistiana/mosdns/v5/pkg/utils"
-	"github.com/IrineSistiana/mosdns/v5/plugin/server/server_utils"
+	"github.com/harlanwei/mosdns-lts/v5/coremain"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/server"
+	"github.com/harlanwei/mosdns-lts/v5/pkg/utils"
+	"github.com/harlanwei/mosdns-lts/v5/plugin/server/server_utils"
 	"github.com/quic-go/quic-go"
 	"go.uber.org/zap"
 )
