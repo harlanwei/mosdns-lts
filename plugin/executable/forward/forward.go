@@ -331,7 +331,10 @@ func quickSetup(bq sequence.BQ, s string) (any, error) {
 }
 
 func (f *Forward) selectUpstreams(us []*upstreamWrapper, count int) []int {
-	const noiseFactor = 0.1
+	const (
+		noiseFactor      = 0.125
+		errorPenaltyMult = 8.0
+	)
 
 	if len(us) <= count {
 		indices := make([]int, len(us))
@@ -349,6 +352,7 @@ func (f *Forward) selectUpstreams(us []*upstreamWrapper, count int) []int {
 
 	for len(selected) < count && len(remaining) > 0 {
 		latencies := make([]float64, len(us))
+		errorRates := make([]float64, len(us))
 		totalWeight := 0.0
 
 		for i := range remaining {
@@ -358,8 +362,18 @@ func (f *Forward) selectUpstreams(us []*upstreamWrapper, count int) []int {
 			}
 			latencies[i] = latency
 
+			queryTotal := us[i].queryCount.Load()
+			errorTotal := us[i].errorCount.Load()
+
+			var errorRate float64
+			if queryTotal > 0 {
+				errorRate = float64(errorTotal) / float64(queryTotal)
+			}
+			errorRates[i] = errorRate
+
 			noise := (rand.Float64()*2 - 1) * noiseFactor
-			weight := (1.0 / latency) * (1 + noise)
+			penaltyFactor := 1.0 + errorRate*errorPenaltyMult
+			weight := (1.0 / (latency * penaltyFactor)) * (1 + noise)
 			totalWeight += weight
 		}
 
@@ -368,7 +382,8 @@ func (f *Forward) selectUpstreams(us []*upstreamWrapper, count int) []int {
 
 		for i := range remaining {
 			noise := (rand.Float64()*2 - 1) * noiseFactor
-			weight := (1.0 / latencies[i]) * (1 + noise)
+			penaltyFactor := 1.0 + errorRates[i]*errorPenaltyMult
+			weight := (1.0 / (latencies[i] * penaltyFactor)) * (1 + noise)
 			cumulativeWeight += weight
 
 			if r <= cumulativeWeight {

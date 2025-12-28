@@ -45,6 +45,8 @@ type upstreamWrapper struct {
 	usedTotal  prometheus.Counter
 
 	emaLatency atomic.Int64
+	queryCount atomic.Int64
+	errorCount atomic.Int64
 }
 
 func (uw *upstreamWrapper) OnEvent(typ upstream.Event) {
@@ -130,6 +132,7 @@ func (uw *upstreamWrapper) name() string {
 
 func (uw *upstreamWrapper) ExchangeContext(ctx context.Context, m []byte) (*[]byte, error) {
 	uw.queryTotal.Inc()
+	uw.queryCount.Add(1)
 
 	start := time.Now()
 	uw.thread.Inc()
@@ -140,6 +143,7 @@ func (uw *upstreamWrapper) ExchangeContext(ctx context.Context, m []byte) (*[]by
 
 	if err != nil {
 		uw.errTotal.Inc()
+		uw.errorCount.Add(1)
 	} else {
 		uw.responseLatency.Observe(float64(latency))
 		uw.updateEmaLatency(latency)
