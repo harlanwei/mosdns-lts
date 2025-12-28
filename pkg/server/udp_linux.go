@@ -61,13 +61,13 @@ func getOOBFromCM6(oob []byte) (net.IP, error) {
 func srcIP2Cm(ip net.IP) []byte {
 	if ip4 := ip.To4(); ip4 != nil {
 		return (&ipv4.ControlMessage{
-			Src: ip,
+			Src: ip4,
 		}).Marshal()
 	}
 
 	if ip6 := ip.To16(); ip6 != nil {
 		return (&ipv6.ControlMessage{
-			Src: ip,
+			Src: ip6,
 		}).Marshal()
 	}
 
@@ -104,6 +104,14 @@ func initOobHandler(c *net.UDPConn) (getSrcAddrFromOOB, writeSrcAddrToOOB, error
 			setter = srcIP2Cm
 			return
 		case unix.AF_INET6:
+			ipv6only, err := unix.GetsockoptInt(int(fd), unix.IPPROTO_IPV6, unix.IPV6_V6ONLY)
+			if err != nil {
+				controlErr = os.NewSyscallError("failed to get IPV6_V6ONLY", err)
+				return
+			}
+			if ipv6only == 1 {
+				return
+			}
 			c6 := ipv6.NewPacketConn(c)
 			if err := c6.SetControlMessage(ipv6.FlagDst, true); err != nil {
 				controlErr = fmt.Errorf("failed to set ipv6 cmsg flags, %w", err)

@@ -3,6 +3,7 @@
 package server_utils
 
 import (
+	"os"
 	"syscall"
 
 	"golang.org/x/sys/unix"
@@ -20,6 +21,20 @@ func ListenerControl(opt ListenerSocketOpts) ControlFunc {
 				errSyscall = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
 				if errSyscall != nil {
 					return
+				}
+			}
+
+			if opt.IPV6_V6ONLY {
+				domain, err := unix.GetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_DOMAIN)
+				if err != nil {
+					errSyscall = os.NewSyscallError("failed to get SO_DOMAIN", err)
+					return
+				}
+				if domain == unix.AF_INET6 {
+					errSyscall = unix.SetsockoptInt(int(fd), unix.IPPROTO_IPV6, unix.IPV6_V6ONLY, 1)
+					if errSyscall != nil {
+						return
+					}
 				}
 			}
 

@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"runtime"
 
 	"github.com/harlanwei/mosdns-lts/v5/pkg/pool"
@@ -82,8 +83,9 @@ func ServeUDP(c *net.UDPConn, h Handler, opts UDPServerOpts) error {
 			continue
 		}
 
-		oobPoolIdx = (oobPoolIdx + 1) % len(oobPool)
+		// Read OOB data from the CURRENT buffer before switching
 		oobBuf := oobPool[oobPoolIdx]
+		oobPoolIdx = (oobPoolIdx + 1) % len(oobPool)
 
 		q := pool.GetDNSMsg()
 		if err := q.Unpack((*rb)[:n]); err != nil {
@@ -118,6 +120,16 @@ func ServeUDP(c *net.UDPConn, h Handler, opts UDPServerOpts) error {
 				pool.ReleaseBuf(rb)
 				pool.ReleaseDNSMsg(q)
 
+				// Check if this is an IPv4-mapped address on an IPv6-only socket
+				// If oobWriter is nil on an IPv6 socket, it means IPV6_V6ONLY=1 is set
+				localAddr := c.LocalAddr().(*net.UDPAddr)
+				if localAddr.IP.To4() == nil && isIPv4Mapped(remoteAddr.Addr()) && oobWriter == nil {
+					// IPv4-mapped address on IPv6-only socket - drop silently
+					// This shouldn't happen if IPV6_V6ONLY is set correctly, but handle gracefully
+					logger.Debug("dropping IPv4-mapped address on IPv6-only socket", zap.Stringer("client", remoteAddr))
+					return
+				}
+
 				var oob []byte
 				if oobWriter != nil && dstIpFromCm != nil {
 					oob = oobWriter(dstIpFromCm)
@@ -132,3 +144,16 @@ func ServeUDP(c *net.UDPConn, h Handler, opts UDPServerOpts) error {
 
 type getSrcAddrFromOOB func(oob []byte) (net.IP, error)
 type writeSrcAddrToOOB func(a net.IP) []byte
+
+// isIPv4Mapped checks if an address is an IPv4-mapped IPv6 address (::ffff:x.x.x.x)
+func isIPv4Mapped(addr netip.Addr) bool {
+	if !addr.Is6() {
+		return false
+	}
+	// IPv4-mapped addresses have the form ::ffff:x.x.x.x
+	// Check if the first 12 bytes are zero and bytes 12-13 are 0xff, 0xff
+	bytes := addr.As16()
+	return bytes[0] == 0 && bytes[1] == 0 && bytes[2] == 0 && bytes[3] == 0 &&
+		bytes[4] == 0 && bytes[5] == 0 && bytes[6] == 0 && bytes[7] == 0 &&
+		bytes[8] == 0 && bytes[9] == 0 && bytes[10] == 0xff && bytes[11] == 0xff
+}

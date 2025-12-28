@@ -72,13 +72,30 @@ func StartServer(bp *coremain.BP, args *Args) (*UdpServer, error) {
 		return nil, fmt.Errorf("failed to init dns handler, %w", err)
 	}
 
+	host, _, err := net.SplitHostPort(args.Listen)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse listen address, %w", err)
+	}
+
+	ip := net.ParseIP(host)
+	// Explicitly use udp4/udp6 to ensure clean separation between IPv4 and IPv6
+	// Using "udp" can create dual-stack sockets on some systems
+	network := "udp4"
+	ipv6only := false
+	if ip != nil && ip.To4() == nil {
+		network = "udp6"
+		// Set IPV6_V6ONLY=1 for IPv6 sockets to prevent IPv4-mapped addresses
+		ipv6only = true
+	}
+
 	socketOpt := server_utils.ListenerSocketOpts{
 		SO_REUSEPORT: true,
 		SO_RCVBUF:    args.SO_RCVBUF,
 		SO_SNDBUF:    args.SO_SNDBUF,
+		IPV6_V6ONLY:  ipv6only,
 	}
 	lc := net.ListenConfig{Control: server_utils.ListenerControl(socketOpt)}
-	c, err := lc.ListenPacket(context.Background(), "udp", args.Listen)
+	c, err := lc.ListenPacket(context.Background(), network, args.Listen)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create socket, %w", err)
 	}

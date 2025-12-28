@@ -82,16 +82,32 @@ func StartServer(bp *coremain.BP, args *Args) (*TcpServer, error) {
 		}
 	}
 
+	host, _, err := net.SplitHostPort(args.Listen)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse listen address, %w", err)
+	}
+
+	ip := net.ParseIP(host)
+	// Explicitly use tcp4/tcp6 to ensure clean separation between IPv4 and IPv6
+	// Using "tcp" can create dual-stack sockets on some systems
+	network := "tcp4"
+	ipv6only := false
+	if ip != nil && ip.To4() == nil {
+		network = "tcp6"
+		// Set IPV6_V6ONLY=1 for IPv6 sockets to prevent IPv4-mapped addresses
+		ipv6only = true
+	}
+
 	socketOpt := server_utils.ListenerSocketOpts{
 		SO_REUSEPORT: true,
 		SO_RCVBUF:    64 * 1024,
+		IPV6_V6ONLY:  ipv6only,
 	}
 	lc := net.ListenConfig{Control: server_utils.ListenerControl(socketOpt)}
-	listenerNetwork := "tcp"
 	if strings.HasPrefix(args.Listen, "@") {
-		listenerNetwork = "unix"
+		network = "unix"
 	}
-	l, err := lc.Listen(context.Background(), listenerNetwork, args.Listen)
+	l, err := lc.Listen(context.Background(), network, args.Listen)
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen socket, %w", err)
 	}

@@ -12,4 +12,5 @@ type ListenerSocketOpts struct {
 	SO_REUSEPORT bool
 	SO_RCVBUF    int
 	SO_SNDBUF    int
+	IPV6_V6ONLY  bool
 }

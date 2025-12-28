@@ -55,7 +55,7 @@ func NewLogger(lc LogConfig) (*zap.Logger, error) {
 
 	var out zapcore.WriteSyncer
 	if lf := lc.File; len(lf) > 0 {
-		f, _, err := zap.Open(lf)
+		f, err := os.OpenFile(lf, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 		if err != nil {
 			return nil, fmt.Errorf("open log file: %w", err)
 		}
