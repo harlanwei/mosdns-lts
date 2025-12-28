@@ -60,6 +60,7 @@ import (
 	_ "github.com/harlanwei/mosdns-lts/v5/plugin/executable/reverse_lookup"
 	_ "github.com/harlanwei/mosdns-lts/v5/plugin/executable/sequence"
 	_ "github.com/harlanwei/mosdns-lts/v5/plugin/executable/sequence/fallback"
+	_ "github.com/harlanwei/mosdns-lts/v5/plugin/executable/shuffle"
 	_ "github.com/harlanwei/mosdns-lts/v5/plugin/executable/sleep"
 	_ "github.com/harlanwei/mosdns-lts/v5/plugin/executable/ttl"
 

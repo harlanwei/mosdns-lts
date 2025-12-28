@@ -331,7 +331,7 @@ func quickSetup(bq sequence.BQ, s string) (any, error) {
 }
 
 func (f *Forward) selectUpstreams(us []*upstreamWrapper, count int) []int {
-	const noiseFactor = 0.2
+	const noiseFactor = 0.1
 
 	if len(us) <= count {
 		indices := make([]int, len(us))
@@ -354,7 +354,7 @@ func (f *Forward) selectUpstreams(us []*upstreamWrapper, count int) []int {
 		for i := range remaining {
 			latency := float64(us[i].getEmaLatency())
 			if latency == 0 {
-				latency = 100.0
+				latency = 10.0
 			}
 			latencies[i] = latency
 
