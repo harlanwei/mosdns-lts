@@ -88,6 +88,16 @@ func (m *Map[K, V]) RangeDo(f func(k K, v V) (newV V, setV, delV bool, err error
 	return nil
 }
 
+// DeleteExpired removes expired entries from all shards.
+// It uses batch deletion for better performance.
+func (m *Map[K, V]) DeleteExpired(shouldDelete func(v V) bool) int {
+	var totalDeleted int
+	for i := range m.shards {
+		totalDeleted += m.shards[i].deleteExpired(shouldDelete)
+	}
+	return totalDeleted
+}
+
 func (m *Map[K, V]) Len() int {
 	l := 0
 	for i := range m.shards {
@@ -183,4 +193,20 @@ func (m *shard[K, V]) rangeDo(f func(k K, v V) (newV V, setV, delV bool, err err
 		}
 	}
 	return nil
+}
+
+// deleteExpired removes expired entries from this shard.
+// It uses batch deletion for better performance.
+func (m *shard[K, V]) deleteExpired(shouldDelete func(v V) bool) int {
+	m.l.Lock()
+	defer m.l.Unlock()
+
+	deleted := 0
+	for k, v := range m.m {
+		if shouldDelete(v) {
+			delete(m.m, k)
+			deleted++
+		}
+	}
+	return deleted
 }

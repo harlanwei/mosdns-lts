@@ -20,6 +20,7 @@
 package qos
 
 import (
+	"container/heap"
 	"context"
 	"errors"
 	"sync"
@@ -35,12 +36,45 @@ type Request struct {
 	Execute  func(context.Context) error
 	Priority int
 	Timer    time.Time
+	index    int // index in the heap, maintained by heap.Interface
+}
+
+// requestHeap implements heap.Interface for priority queue
+type requestHeap []*Request
+
+func (h requestHeap) Len() int { return len(h) }
+
+func (h requestHeap) Less(i, j int) bool {
+	return h[i].Priority < h[j].Priority
+}
+
+func (h requestHeap) Swap(i, j int) {
+	h[i], h[j] = h[j], h[i]
+	h[i].index = i
+	h[j].index = j
+}
+
+func (h *requestHeap) Push(x any) {
+	n := len(*h)
+	req := x.(*Request)
+	req.index = n
+	*h = append(*h, req)
+}
+
+func (h *requestHeap) Pop() any {
+	old := *h
+	n := len(old)
+	req := old[n-1]
+	old[n-1] = nil
+	req.index = -1
+	*h = old[:n-1]
+	return req
 }
 
 type RequestQueue struct {
 	mu sync.Mutex
 
-	queue       []*Request
+	heap        requestHeap
 	maxSize     int
 	maxWaitTime time.Duration
 
@@ -62,7 +96,7 @@ func NewRequestQueue(cfg QueueConfig) *RequestQueue {
 	}
 
 	return &RequestQueue{
-		queue:       make([]*Request, 0, cfg.MaxSize),
+		heap:        make(requestHeap, 0, cfg.MaxSize),
 		maxSize:     cfg.MaxSize,
 		maxWaitTime: cfg.MaxWaitTime,
 	}
@@ -72,12 +106,12 @@ func (q *RequestQueue) Enqueue(req *Request) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	if len(q.queue) >= q.maxSize {
+	if len(q.heap) >= q.maxSize {
 		q.droppedCount.Add(1)
 		return ErrQueueFull
 	}
 
-	q.queue = append(q.queue, req)
+	heap.Push(&q.heap, req)
 	return nil
 }
 
@@ -85,27 +119,17 @@ func (q *RequestQueue) Dequeue(ctx context.Context) (*Request, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	if len(q.queue) == 0 {
-		return nil, nil
-	}
-
 	now := time.Now()
-	bestIdx := -1
-	bestPriority := int(^uint(0) >> 1)
 
-	for i, req := range q.queue {
+	// Remove expired or invalid items from the top of the heap
+	for len(q.heap) > 0 {
+		req := q.heap[0]
 		if now.Sub(req.Timer) > q.maxWaitTime {
+			heap.Pop(&q.heap)
 			continue
 		}
-		if req.Priority < bestPriority {
-			bestPriority = req.Priority
-			bestIdx = i
-		}
-	}
-
-	if bestIdx >= 0 {
-		req := q.queue[bestIdx]
-		q.queue = append(q.queue[:bestIdx], q.queue[bestIdx+1:]...)
+		// Found a valid request
+		heap.Pop(&q.heap)
 		return req, nil
 	}
 
@@ -115,7 +139,7 @@ func (q *RequestQueue) Dequeue(ctx context.Context) (*Request, error) {
 func (q *RequestQueue) Len() int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	return len(q.queue)
+	return len(q.heap)
 }
 
 func (q *RequestQueue) Cap() int {
@@ -134,10 +158,10 @@ func (q *RequestQueue) Clear() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	for _, req := range q.queue {
+	for _, req := range q.heap {
 		req.Timer = time.Time{}
 	}
-	q.queue = q.queue[:0]
+	q.heap = q.heap[:0]
 }
 
 func (q *RequestQueue) Process(ctx context.Context) error {

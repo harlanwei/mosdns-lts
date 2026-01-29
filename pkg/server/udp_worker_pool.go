@@ -138,13 +138,31 @@ func (p *udpWorkerPool) submit(q *dns.Msg, clientAddr, remoteAddr netip.AddrPort
 	worker := p.workers[p.nextWorker]
 	p.nextWorker = (p.nextWorker + 1) % len(p.workers)
 
-	worker.submit(udpRequest{
+	req := udpRequest{
 		q:           q,
 		clientAddr:  clientAddr.Addr(),
 		dstIpFromCm: dstIpFromCm,
 		remoteAddr:  remoteAddr,
 		oobWriter:   p.oobWriter,
-	})
+	}
+
+	select {
+	case worker.requestChan <- req:
+	default:
+		// Channel is full, try next worker
+		for i := 1; i < len(p.workers); i++ {
+			worker = p.workers[(p.nextWorker+i)%len(p.workers)]
+			select {
+			case worker.requestChan <- req:
+				return
+			default:
+				continue
+			}
+		}
+		// All workers are busy, block on the original worker
+		worker = p.workers[p.nextWorker]
+		worker.requestChan <- req
+	}
 }
 
 func (p *udpWorkerPool) stop() {

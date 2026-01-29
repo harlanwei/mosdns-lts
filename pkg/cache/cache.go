@@ -20,11 +20,12 @@
 package cache
 
 import (
+	"sync/atomic"
+	"time"
+
 	"github.com/harlanwei/mosdns-lts/v5/pkg/concurrent_lru"
 	"github.com/harlanwei/mosdns-lts/v5/pkg/concurrent_map"
 	"github.com/harlanwei/mosdns-lts/v5/pkg/utils"
-	"sync/atomic"
-	"time"
 )
 
 const (
@@ -140,10 +141,9 @@ func (c *Cache[K, V]) gcLoop(interval time.Duration) {
 }
 
 func (c *Cache[K, V]) gc(now time.Time) {
-	f := func(key K, v *elem[V]) (newV *elem[V], setV, delV bool, err error) {
-		return nil, false, now.After(v.expirationTime), nil
-	}
-	_ = c.m.RangeDo(f)
+	c.m.DeleteExpired(func(v *elem[V]) bool {
+		return now.After(v.expirationTime)
+	})
 }
 
 // Len returns the current size of this cache.
