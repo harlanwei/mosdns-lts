@@ -85,6 +85,7 @@ type Cache struct {
 
 	logger       *zap.Logger
 	backend      *cache.Cache[key, *item]
+	entries      sync.Map // for dump support: map[key]*entryMeta
 	lazyUpdateSF singleflight.Group
 	closeOnce    sync.Once
 	closeNotify  chan struct{}
@@ -94,6 +95,13 @@ type Cache struct {
 	hitTotal     prometheus.Counter
 	lazyHitTotal prometheus.Counter
 	size         prometheus.GaugeFunc
+}
+
+type entryMeta struct {
+	v              *item
+	cacheExpTime   time.Time
+	storedTime     time.Time
+	expirationTime time.Time
 }
 
 func Init(bp *coremain.BP, args any) (any, error) {
@@ -209,7 +217,7 @@ func (c *Cache) Exec(ctx context.Context, qCtx *query_context.Context, next sequ
 	err := next.ExecNext(ctx, qCtx)
 
 	if r := qCtx.R(); r != nil && cachedResp != r { // pointer compare. r is not cachedResp
-		saveRespToCache(msgKey, r, c.backend, c.args.LazyCacheTTL)
+		saveRespToCache(msgKey, r, c.backend, c.args.LazyCacheTTL, &c.entries)
 		c.updatedKey.Add(1)
 	}
 	return err
@@ -234,7 +242,7 @@ func (c *Cache) doLazyUpdate(msgKey string, qCtx *query_context.Context, next se
 
 		r := qCtx.R()
 		if r != nil {
-			saveRespToCache(msgKey, r, c.backend, c.args.LazyCacheTTL)
+			saveRespToCache(msgKey, r, c.backend, c.args.LazyCacheTTL, &c.entries)
 			c.updatedKey.Add(1)
 		}
 		c.logger.Debug("lazy cache updated", qCtx.InfoField())
@@ -370,31 +378,32 @@ func (c *Cache) writeDump(w io.Writer) (int, error) {
 	}
 
 	now := time.Now()
-	rangeFunc := func(k key, v *item, cacheExpirationTime time.Time) error {
-		if cacheExpirationTime.Before(now) {
-			return nil
+	c.entries.Range(func(k, v any) bool {
+		key := k.(key)
+		meta := v.(*entryMeta)
+		if meta.cacheExpTime.Before(now) {
+			c.entries.Delete(key)
+			return true
 		}
-		msg, err := v.resp.Pack()
+		msg, err := meta.v.resp.Pack()
 		if err != nil {
-			return fmt.Errorf("failed to pack msg, %w", err)
+			return true
 		}
 		e := &CachedEntry{
-			Key:                 []byte(k),
-			CacheExpirationTime: cacheExpirationTime.Unix(),
-			MsgExpirationTime:   v.expirationTime.Unix(),
+			Key:                 []byte(key),
+			CacheExpirationTime: meta.cacheExpTime.Unix(),
+			MsgExpirationTime:   meta.expirationTime.Unix(),
 			Msg:                 msg,
 		}
 		block.Entries = append(block.Entries, e)
 
-		// Block is big enough for a write operation.
 		if len(block.Entries) >= dumpBlockSize {
-			return writeBlock()
+			if err := writeBlock(); err != nil {
+				return false
+			}
 		}
-		return nil
-	}
-	if err := c.backend.Range(rangeFunc); err != nil {
-		return en, err
-	}
+		return true
+	})
 
 	if len(block.GetEntries()) > 0 {
 		if err := writeBlock(); err != nil {
@@ -459,7 +468,14 @@ func (c *Cache) readDump(r io.Reader) (int, error) {
 				storedTime:     storedTime,
 				expirationTime: msgExpTime,
 			}
-			c.backend.Store(key(entry.GetKey()), i, cacheExpTime)
+			k := key(entry.GetKey())
+			c.backend.Store(k, i, cacheExpTime)
+			c.entries.Store(k, &entryMeta{
+				v:              i,
+				cacheExpTime:   cacheExpTime,
+				storedTime:     storedTime,
+				expirationTime: msgExpTime,
+			})
 		}
 		return nil
 	}

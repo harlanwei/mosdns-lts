@@ -20,8 +20,9 @@
 package concurrent_lru
 
 import (
-	"github.com/harlanwei/mosdns-lts/v5/pkg/lru"
 	"sync"
+
+	lru "github.com/hashicorp/golang-lru/v2/simplelru"
 )
 
 type Hashable interface {
@@ -42,7 +43,7 @@ func NewShardedLRU[K Hashable, V any](
 	}
 
 	for i := 0; i < shardNum; i++ {
-		cl.l = append(cl.l, NewConecurrentLRU[K, V](maxSizePerShard, onEvict))
+		cl.l = append(cl.l, NewConcurrentLRU[K, V](maxSizePerShard, onEvict))
 	}
 
 	return cl
@@ -93,57 +94,72 @@ func (c *ShardedLRU[K, V]) getShard(key K) *ConcurrentLRU[K, V] {
 	return c.l[key.Sum()%uint64(c.shardNum())]
 }
 
-// ConcurrentLRU is a lru.LRU with a lock.
-// It is concurrent safe.
 type ConcurrentLRU[K comparable, V any] struct {
-	sync.Mutex
-	lru *lru.LRU[K, V]
+	mu       sync.RWMutex
+	lru      *lru.LRU[K, V]
+	onEvict  func(key K, v V)
 }
 
-func NewConecurrentLRU[K comparable, V any](maxSize int, onEvict func(key K, v V)) *ConcurrentLRU[K, V] {
+func NewConcurrentLRU[K comparable, V any](maxSize int, onEvict func(key K, v V)) *ConcurrentLRU[K, V] {
+	evictCb := func(key K, v V) {
+		if onEvict != nil {
+			onEvict(key, v)
+		}
+	}
+	
+	l, err := lru.NewLRU[K, V](maxSize, evictCb)
+	if err != nil {
+		panic(err)
+	}
+
 	return &ConcurrentLRU[K, V]{
-		lru: lru.NewLRU[K, V](maxSize, onEvict),
+		lru:     l,
+		onEvict: onEvict,
 	}
 }
 
 func (c *ConcurrentLRU[K, V]) Add(key K, v V) {
-	c.Lock()
-	defer c.Unlock()
-
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.lru.Add(key, v)
 }
 
 func (c *ConcurrentLRU[K, V]) Del(key K) {
-	c.Lock()
-	defer c.Unlock()
-
-	c.lru.Del(key)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.lru.Remove(key)
 }
 
 func (c *ConcurrentLRU[K, V]) Clean(f func(key K, v V) (remove bool)) (removed int) {
-	c.Lock()
-	defer c.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	return c.lru.Clean(f)
+	keys := c.lru.Keys()
+	for _, key := range keys {
+		if val, ok := c.lru.Get(key); ok {
+			if f(key, val) {
+				c.lru.Remove(key)
+				removed++
+			}
+		}
+	}
+	return removed
 }
 
 func (c *ConcurrentLRU[K, V]) Flush() {
-	c.Lock()
-	defer c.Unlock()
-	c.lru.Flush()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.lru.Purge()
 }
 
 func (c *ConcurrentLRU[K, V]) Get(key K) (v V, ok bool) {
-	c.Lock()
-	defer c.Unlock()
-
-	v, ok = c.lru.Get(key)
-	return
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.lru.Get(key)
 }
 
 func (c *ConcurrentLRU[K, V]) Len() int {
-	c.Lock()
-	defer c.Unlock()
-
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.lru.Len()
 }

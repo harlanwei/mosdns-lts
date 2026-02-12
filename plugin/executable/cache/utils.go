@@ -21,6 +21,7 @@ package cache
 
 import (
 	"hash/maphash"
+	"sync"
 	"time"
 
 	"github.com/harlanwei/mosdns-lts/v5/pkg/cache"
@@ -163,7 +164,7 @@ func getRespFromCache(msgKey string, backend *cache.Cache[key, *item], lazyCache
 
 // saveRespToCache saves r to cache backend. It returns false if r
 // should not be cached and was skipped.
-func saveRespToCache(msgKey string, r *dns.Msg, backend *cache.Cache[key, *item], lazyCacheTtl int) bool {
+func saveRespToCache(msgKey string, r *dns.Msg, backend *cache.Cache[key, *item], lazyCacheTtl int, entries *sync.Map) bool {
 	if r.Truncated != false {
 		return false
 	}
@@ -202,6 +203,15 @@ func saveRespToCache(msgKey string, r *dns.Msg, backend *cache.Cache[key, *item]
 		storedTime:     now,
 		expirationTime: now.Add(msgTtl),
 	}
-	backend.Store(key(msgKey), v, now.Add(cacheTtl))
+	cacheExpTime := now.Add(cacheTtl)
+	backend.Store(key(msgKey), v, cacheExpTime)
+	if entries != nil {
+		entries.Store(key(msgKey), &entryMeta{
+			v:              v,
+			cacheExpTime:   cacheExpTime,
+			storedTime:     now,
+			expirationTime: now.Add(msgTtl),
+		})
+	}
 	return true
 }

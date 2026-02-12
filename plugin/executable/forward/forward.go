@@ -24,7 +24,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"math/rand/v2"
 	"strings"
 	"time"
 
@@ -104,6 +103,8 @@ type Forward struct {
 	logger       *zap.Logger
 	us           []*upstreamWrapper
 	tag2Upstream map[string]*upstreamWrapper // for fast tag lookup only.
+
+	selector *upstreamSelector
 }
 
 type Opts struct {
@@ -176,6 +177,8 @@ func NewForward(args *Args, opt Opts) (*Forward, error) {
 			f.tag2Upstream[c.Tag] = uw
 		}
 	}
+
+	f.selector = newUpstreamSelector(f.us)
 
 	return f, nil
 }
@@ -263,7 +266,7 @@ func (f *Forward) exchange(ctx context.Context, qCtx *query_context.Context, us 
 	done := make(chan struct{})
 	defer close(done)
 
-	selectedIndices := f.selectUpstreams(us, concurrent)
+	selectedIndices := f.selector.selectUpstreams(concurrent)
 	for _, idx := range selectedIndices {
 		u := us[idx]
 		qc := copyPayload(queryPayload)
@@ -328,71 +331,4 @@ func quickSetup(bq sequence.BQ, s string) (any, error) {
 		args.Upstreams = append(args.Upstreams, UpstreamConfig{Addr: u})
 	}
 	return NewForward(args, Opts{Logger: bq.L()})
-}
-
-func (f *Forward) selectUpstreams(us []*upstreamWrapper, count int) []int {
-	const (
-		noiseFactor      = 0.125
-		errorPenaltyMult = 8.0
-	)
-
-	if len(us) <= count {
-		indices := make([]int, len(us))
-		for i := range indices {
-			indices[i] = i
-		}
-		return indices
-	}
-
-	selected := make([]int, 0, count)
-	remaining := make(map[int]bool)
-	for i := range us {
-		remaining[i] = true
-	}
-
-	for len(selected) < count && len(remaining) > 0 {
-		latencies := make([]float64, len(us))
-		errorRates := make([]float64, len(us))
-		totalWeight := 0.0
-
-		for i := range remaining {
-			latency := float64(us[i].getEmaLatency())
-			if latency == 0 {
-				latency = 10.0
-			}
-			latencies[i] = latency
-
-			queryTotal := us[i].queryCount.Load()
-			errorTotal := us[i].errorCount.Load()
-
-			var errorRate float64
-			if queryTotal > 0 {
-				errorRate = float64(errorTotal) / float64(queryTotal)
-			}
-			errorRates[i] = errorRate
-
-			noise := (rand.Float64()*2 - 1) * noiseFactor
-			penaltyFactor := 1.0 + errorRate*errorPenaltyMult
-			weight := (1.0 / (latency * penaltyFactor)) * (1 + noise)
-			totalWeight += weight
-		}
-
-		r := rand.Float64() * totalWeight
-		cumulativeWeight := 0.0
-
-		for i := range remaining {
-			noise := (rand.Float64()*2 - 1) * noiseFactor
-			penaltyFactor := 1.0 + errorRates[i]*errorPenaltyMult
-			weight := (1.0 / (latencies[i] * penaltyFactor)) * (1 + noise)
-			cumulativeWeight += weight
-
-			if r <= cumulativeWeight {
-				selected = append(selected, i)
-				delete(remaining, i)
-				break
-			}
-		}
-	}
-
-	return selected
 }

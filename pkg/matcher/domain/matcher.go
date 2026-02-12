@@ -23,8 +23,9 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"strings"
+	"sync"
 
+	"github.com/cloudflare/ahocorasick"
 	"github.com/harlanwei/mosdns-lts/v5/pkg/utils"
 )
 
@@ -109,32 +110,72 @@ func (m *FullMatcher[T]) Len() int {
 }
 
 type KeywordMatcher[T any] struct {
-	kws map[string]T
+	mu       sync.RWMutex
+	kws      map[string]T
+	keywords []string
+	matcher  *ahocorasick.Matcher
+	dirty    bool
 }
 
 func NewKeywordMatcher[T any]() *KeywordMatcher[T] {
 	return &KeywordMatcher[T]{
-		kws: make(map[string]T),
+		kws:   make(map[string]T),
+		dirty: true,
 	}
 }
 
+func (m *KeywordMatcher[T]) buildMatcher() {
+	m.mu.RLock()
+	if !m.dirty && m.matcher != nil {
+		m.mu.RUnlock()
+		return
+	}
+	m.mu.RUnlock()
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if !m.dirty && m.matcher != nil {
+		return
+	}
+
+	m.keywords = make([]string, 0, len(m.kws))
+	for k := range m.kws {
+		m.keywords = append(m.keywords, k)
+	}
+	if len(m.keywords) > 0 {
+		m.matcher = ahocorasick.NewStringMatcher(m.keywords)
+	}
+	m.dirty = false
+}
+
 func (m *KeywordMatcher[T]) Add(keyword string, v T) error {
-	keyword = NormalizeDomain(keyword) // fqdn-insensitive and case-insensitive
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	keyword = NormalizeDomain(keyword)
 	m.kws[keyword] = v
+	m.dirty = true
 	return nil
 }
 
 func (m *KeywordMatcher[T]) Match(s string) (v T, ok bool) {
 	s = NormalizeDomain(s)
-	for k, v := range m.kws {
-		if strings.Contains(s, k) {
-			return v, true
-		}
+	m.buildMatcher()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.matcher == nil || len(m.kws) == 0 {
+		return v, false
+	}
+	matches := m.matcher.Match([]byte(s))
+	if len(matches) > 0 {
+		k := m.keywords[matches[0]]
+		return m.kws[k], true
 	}
 	return v, false
 }
 
 func (m *KeywordMatcher[T]) Len() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return len(m.kws)
 }
 

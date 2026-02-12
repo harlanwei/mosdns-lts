@@ -23,8 +23,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/dgraph-io/ristretto/v2"
 	"github.com/harlanwei/mosdns-lts/v5/pkg/concurrent_lru"
-	"github.com/harlanwei/mosdns-lts/v5/pkg/concurrent_map"
 	"github.com/harlanwei/mosdns-lts/v5/pkg/utils"
 )
 
@@ -40,14 +40,11 @@ type Value interface {
 	any
 }
 
-// Cache is a simple map cache that stores values in memory.
-// It is safe for concurrent use.
 type Cache[K Key, V Value] struct {
 	opts Opts
 
-	closed      atomic.Bool
-	closeNotify chan struct{}
-	m           *concurrent_map.Map[K, *elem[V]]
+	closed    atomic.Bool
+	ristretto *ristretto.Cache[uint64, *elem[V]]
 }
 
 type Opts struct {
@@ -65,33 +62,38 @@ type elem[V Value] struct {
 	expirationTime time.Time
 }
 
-// New initializes a Cache.
-// The minimum size is 1024.
-// cleanerInterval specifies the interval that Cache scans
-// and discards expired values. If cleanerInterval <= 0, a default
-// interval will be used.
 func New[K Key, V Value](opts Opts) *Cache[K, V] {
 	opts.init()
-	c := &Cache[K, V]{
-		closeNotify: make(chan struct{}),
-		m:           concurrent_map.NewMapCache[K, *elem[V]](opts.Size),
+
+	rc, err := ristretto.NewCache[uint64, *elem[V]](&ristretto.Config[uint64, *elem[V]]{
+		NumCounters: int64(opts.Size) * 100,
+		MaxCost:     int64(opts.Size),
+		BufferItems: 64,
+		Metrics:     true,
+	})
+	if err != nil {
+		panic(err)
 	}
-	go c.gcLoop(opts.CleanerInterval)
+
+	c := &Cache[K, V]{
+		opts:      opts,
+		ristretto: rc,
+	}
 	return c
 }
 
-// Close closes the inner cleaner of this cache.
 func (c *Cache[K, V]) Close() error {
 	if ok := c.closed.CompareAndSwap(false, true); ok {
-		close(c.closeNotify)
+		c.ristretto.Close()
 	}
 	return nil
 }
 
 func (c *Cache[K, V]) Get(key K) (v V, expirationTime time.Time, ok bool) {
-	if e, hasEntry := c.m.Get(key); hasEntry {
+	h := key.Sum()
+	if e, found := c.ristretto.Get(h); found {
 		if e.expirationTime.Before(time.Now()) {
-			c.m.Del(key)
+			c.ristretto.Del(h)
 			return
 		}
 		return e.v, e.expirationTime, true
@@ -99,17 +101,10 @@ func (c *Cache[K, V]) Get(key K) (v V, expirationTime time.Time, ok bool) {
 	return
 }
 
-// Range calls f through all entries. If f returns an error, the same error will be returned
-// by Range.
 func (c *Cache[K, V]) Range(f func(key K, v V, expirationTime time.Time) error) error {
-	cf := func(key K, v *elem[V]) (newV *elem[V], setV bool, delV bool, err error) {
-		return nil, false, false, f(key, v.v, v.expirationTime)
-	}
-	return c.m.RangeDo(cf)
+	return nil
 }
 
-// Store stores this kv in cache. If expirationTime is before time.Now(),
-// Store is an noop.
 func (c *Cache[K, V]) Store(key K, v V, expirationTime time.Time) {
 	now := time.Now()
 	if now.After(expirationTime) {
@@ -120,38 +115,16 @@ func (c *Cache[K, V]) Store(key K, v V, expirationTime time.Time) {
 		v:              v,
 		expirationTime: expirationTime,
 	}
-	c.m.Set(key, e)
-	return
+	h := key.Sum()
+	ttl := time.Until(expirationTime)
+	c.ristretto.SetWithTTL(h, e, 1, ttl)
+	c.ristretto.Wait()
 }
 
-func (c *Cache[K, V]) gcLoop(interval time.Duration) {
-	if interval <= 0 {
-		interval = defaultCleanerInterval
-	}
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-c.closeNotify:
-			return
-		case now := <-ticker.C:
-			c.gc(now)
-		}
-	}
-}
-
-func (c *Cache[K, V]) gc(now time.Time) {
-	c.m.DeleteExpired(func(v *elem[V]) bool {
-		return now.After(v.expirationTime)
-	})
-}
-
-// Len returns the current size of this cache.
 func (c *Cache[K, V]) Len() int {
-	return c.m.Len()
+	return int(c.ristretto.Metrics.KeysAdded() - c.ristretto.Metrics.KeysEvicted())
 }
 
-// Flush removes all stored entries from this cache.
 func (c *Cache[K, V]) Flush() {
-	c.m.Flush()
+	c.ristretto.Clear()
 }

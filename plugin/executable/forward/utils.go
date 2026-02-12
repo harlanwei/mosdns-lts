@@ -21,6 +21,8 @@ package fastforward
 
 import (
 	"context"
+	"math/rand/v2"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -30,6 +32,125 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap/zapcore"
 )
+
+const (
+	weightCacheTTL   = time.Second * 5
+	noiseFactor      = 0.125
+	errorPenaltyMult = 8.0
+	defaultLatency   = 10.0
+)
+
+type upstreamScore struct {
+	idx   int
+	score float64
+}
+
+type upstreamSelector struct {
+	us []*upstreamWrapper
+
+	mu          sync.RWMutex
+	cachedOrder []int
+	lastUpdate  time.Time
+}
+
+func newUpstreamSelector(us []*upstreamWrapper) *upstreamSelector {
+	return &upstreamSelector{
+		us: us,
+	}
+}
+
+func (s *upstreamSelector) selectUpstreams(count int) []int {
+	if len(s.us) <= count {
+		indices := make([]int, len(s.us))
+		for i := range indices {
+			indices[i] = i
+		}
+		return indices
+	}
+
+	s.mu.RLock()
+	if s.cachedOrder != nil && time.Since(s.lastUpdate) < weightCacheTTL {
+		order := make([]int, count)
+		copy(order, s.cachedOrder[:count])
+		s.mu.RUnlock()
+		return order
+	}
+	s.mu.RUnlock()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.cachedOrder != nil && time.Since(s.lastUpdate) < weightCacheTTL {
+		order := make([]int, count)
+		copy(order, s.cachedOrder[:count])
+		return order
+	}
+
+	scores := s.calculateScores()
+
+	totalWeight := 0.0
+	for _, sc := range scores {
+		totalWeight += sc.score
+	}
+
+	selected := make([]int, 0, count)
+	used := make(map[int]bool)
+
+	for len(selected) < count {
+		r := rand.Float64() * totalWeight
+		cumulative := 0.0
+
+		for _, sc := range scores {
+			if used[sc.idx] {
+				continue
+			}
+			cumulative += sc.score
+			if r <= cumulative {
+				selected = append(selected, sc.idx)
+				used[sc.idx] = true
+				totalWeight -= sc.score
+				break
+			}
+		}
+	}
+
+	s.cachedOrder = selected
+	s.lastUpdate = time.Now()
+
+	result := make([]int, count)
+	copy(result, selected)
+	return result
+}
+
+func (s *upstreamSelector) calculateScores() []upstreamScore {
+	scores := make([]upstreamScore, len(s.us))
+
+	for i, uw := range s.us {
+		latency := float64(uw.getEmaLatency())
+		if latency == 0 {
+			latency = defaultLatency
+		}
+
+		queryTotal := uw.queryCount.Load()
+		errorTotal := uw.errorCount.Load()
+
+		var errorRate float64
+		if queryTotal > 0 {
+			errorRate = float64(errorTotal) / float64(queryTotal)
+		}
+
+		noise := (rand.Float64()*2 - 1) * noiseFactor
+		penaltyFactor := 1.0 + errorRate*errorPenaltyMult
+		score := (1.0 / (latency * penaltyFactor)) * (1 + noise)
+
+		scores[i] = upstreamScore{
+			idx:   i,
+			score: score,
+		}
+	}
+
+	return scores
+}
 
 type upstreamWrapper struct {
 	idx             int
